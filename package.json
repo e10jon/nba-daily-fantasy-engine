@@ -1,0 +1,24 @@
+{
+  "name": "nba-daily-fantasy-engine",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "knex": "knex",
+    "scrape": "ts-node scraper.ts"
+  },
+  "author": "Ethan Jon",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "date-fns": "^1.29.0",
+    "knex": "^0.14.6",
+    "mysql2": "^1.5.3",
+    "progress": "^2.0.0",
+    "scrape-it": "^5.0.5",
+    "ts-node": "^6.1.2",
+    "typescript": "^2.9.2"
+  },
+  "devDependencies": {
+    "@types/node": "^10.3.4"
+  }
+}
