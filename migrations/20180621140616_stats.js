@@ -14,6 +14,8 @@ module.exports = {
       table.float('draftkingsPoints')
       table.float('fanduelPointsPerMinute')
       table.float('draftkingsPointsPerMinute')
+      table.float('fanduelPointsPerKDollars')
+      table.float('draftkingsPointsPerKDollars')
     })
   ),
 

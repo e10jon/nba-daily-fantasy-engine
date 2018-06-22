@@ -18,6 +18,8 @@ interface Row {
   draftkingsPointsPerMinute?: number, 
   fanduelSalary?: number,
   draftkingsSalary?: number,
+  fanduelPointsPerKDollars?: number,
+  draftkingsPointsPerKDollars?: number,
 }
 
 class Scraper {
@@ -114,10 +116,12 @@ class Scraper {
 
       const rowsMap = allRows.reduce((map, rows) => {
         for (const row of rows) {
-          if (row.fanduelPoints && row.minutes) {
-            row.fanduelPointsPerMinute = row.fanduelPoints / row.minutes
-          } else if (row.draftkingsPoints && row.minutes) {
-            row.draftkingsPointsPerMinute = row.draftkingsPoints / row.minutes
+          if (row.fanduelPoints) {
+            row.fanduelPointsPerMinute = row.minutes ? row.fanduelPoints / row.minutes : 0
+            row.fanduelPointsPerKDollars = row.fanduelSalary ? row.fanduelPoints / row.fanduelSalary * 1000 : 0
+          } else if (row.draftkingsPoints) {
+            row.draftkingsPointsPerMinute = row.minutes ? row.draftkingsPoints / row.minutes : 0
+            row.draftkingsPointsPerKDollars = row.draftkingsSalary ? row.draftkingsPoints / row.draftkingsSalary * 1000 : 0
           }
           if (map.has(row.playerId)) {
             map.set(row.playerId, {...map.get(row.playerId), ...row})
