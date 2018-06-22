@@ -11,8 +11,11 @@ interface Row {
   playerId: number, 
   position: string, 
   name: string, 
+  minutes: number,
   fanduelPoints?: number,
   draftkingsPoints?: number, 
+  fanduelPointsPerMinute?: number,
+  draftkingsPointsPerMinute?: number, 
   fanduelSalary?: number,
   draftkingsSalary?: number,
 }
@@ -29,6 +32,13 @@ class Scraper {
   }
 
   private static convertName = raw => raw.replace(/\^$/, '')
+
+  private static convertMinutes = raw => {
+    // may look like "12:50" or "DNP" or "N/A"
+    const parts = raw.split(':')
+    if (parts.length !== 2) return 0
+    return parseInt(parts[0]) + (parseInt(parts[1]) / 60)
+  }
 
   private static isValidScrapedRow = r => r.playerId && (!isNaN(r.fanduelPoints) || !isNaN(r.draftkingsPoints)) && (!isNaN(r.fanduelSalary) || !isNaN(r.draftkingsSalary))
 
@@ -50,7 +60,12 @@ class Scraper {
   private endDate: Date
 
   public constructor (season: number) {
-    const {startDate, endDate} = Scraper.SEASONS[season]
+    const [startDate, endDate] = Scraper.SEASONS[season]
+    
+    if (!startDate || !endDate) {
+      throw new Error('invalid season')
+    }
+
     this.startDate = startDate
     this.endDate = endDate
   }
@@ -85,6 +100,7 @@ class Scraper {
               name: {selector: 'td', eq: 1, convert: Scraper.convertName},
               [pointsKey]: {selector: 'td', eq: 2, convert: x => parseFloat(x)},
               [salaryKey]: {selector: 'td', eq: 3, convert: x => parseInt(x.slice(1).replace(/,/, ''))},
+              minutes: {selector: 'td', eq: 7, convert: Scraper.convertMinutes},
             }
           }
         })
@@ -96,8 +112,13 @@ class Scraper {
         }
       }))
 
-      const rows = allRows.reduce((map, rows) => {
+      const rowsMap = allRows.reduce((map, rows) => {
         for (const row of rows) {
+          if (row.fanduelPoints && row.minutes) {
+            row.fanduelPointsPerMinute = row.fanduelPoints / row.minutes
+          } else if (row.draftkingsPoints && row.minutes) {
+            row.draftkingsPointsPerMinute = row.draftkingsPoints / row.minutes
+          }
           if (map.has(row.playerId)) {
             map.set(row.playerId, {...map.get(row.playerId), ...row})
           } else {
@@ -107,9 +128,8 @@ class Scraper {
         return map
       }, new Map())
 
-      for (const [playerId, row] of rows) {
-        await knex('stats').insert(row)
-      }
+      const rows = Array.from(rowsMap.values())
+      await knex.batchInsert('stats', rows, 500)
 
       progressBar.tick({date: formatDate(date, 'YYYY-M-D')})
     }
