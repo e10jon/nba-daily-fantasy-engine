@@ -8,6 +8,7 @@ import knex from './knex'
 
 interface Row {
   date: Date,
+  didStart: boolean,
   playerId: number, 
   position: string, 
   name: string, 
@@ -103,6 +104,7 @@ class Scraper {
               [pointsKey]: {selector: 'td', eq: 2, convert: x => parseFloat(x)},
               [salaryKey]: {selector: 'td', eq: 3, convert: x => parseInt(x.slice(1).replace(/,/, ''))},
               minutes: {selector: 'td', eq: 7, convert: Scraper.convertMinutes},
+              didStart: {selector: 'td', eq: 1, convert: x => x && x.endsWith('^')},
             }
           }
         })

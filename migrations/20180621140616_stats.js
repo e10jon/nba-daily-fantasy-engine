@@ -8,6 +8,7 @@ module.exports = {
       table.integer('season')
       table.string('position')
       table.float('minutes')
+      table.boolean('didStart')
       table.integer('fanduelSalary')
       table.integer('draftkingsSalary')
       table.float('fanduelPoints')
