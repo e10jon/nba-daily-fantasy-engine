@@ -5,20 +5,31 @@
   "main": "index.js",
   "scripts": {
     "knex": "knex",
-    "scrape": "ts-node scraper.ts"
+    "scrape": "ts-node scraper.ts",
+    "dev": "next"
   },
   "author": "Ethan Jon",
   "license": "UNLICENSED",
   "dependencies": {
     "date-fns": "^1.29.0",
     "knex": "^0.14.6",
+    "lodash": "^4.17.10",
     "mysql2": "^1.5.3",
+    "next": "^6.0.3",
+    "plotly.js": "^1.38.3",
     "progress": "^2.0.0",
+    "react": "^16.4.1",
+    "react-dom": "^16.4.1",
+    "react-plotly.js": "^2.2.0",
+    "rebass": "^2.0.0-7",
     "scrape-it": "^5.0.5",
+    "styled-components": "^3.3.3",
     "ts-node": "^6.1.2",
     "typescript": "^2.9.2"
   },
   "devDependencies": {
+    "@types/react": "^16.4.1",
+    "@zeit/next-typescript": "^1.1.0",
     "@types/node": "^10.3.4"
   }
 }
