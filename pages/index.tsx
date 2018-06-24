@@ -6,6 +6,7 @@ import * as React from 'react'
 import {Box, Divider, Flex, Heading} from 'rebass'
 
 import knex from '../knex'
+import SEASONS from '../seasons'
 
 const Plot = dynamic(import('../components/plot'), {ssr: false})
 
@@ -14,6 +15,7 @@ interface Props {
   maxFanduelPointsPerMinute: number,
   maxFanduelPointsPerKDollars: number,
   maxFanduelSalary: number,
+  season: [number, number],
   stats: Array<Array<any>>,
 }
 
@@ -23,18 +25,19 @@ const PER_PAGE = 20
 
 class Home extends React.Component<Props> {
   static getInitialProps = async ({query}) => {
+    const season = SEASONS[query.season || '2017']
     const page = parseInt(query.page || '1')
     const playerIds = map(await knex('stats').distinct('playerId').orderBy('name', 'ASC').limit(PER_PAGE).offset((page - 1) * PER_PAGE), 'playerId')
-    const stats = values(groupBy(await knex('stats').whereIn('playerId', playerIds).orderBy('date', 'ASC'), 'playerId'))
+    const stats = values(groupBy(await knex('stats').whereIn('playerId', playerIds).where('date', '>=', season[0]).andWhere('date', '<=', season[1]).orderBy('date', 'ASC'), 'playerId'))
     const maxFanduelSalary = (await knex('stats').max('fanduelSalary as max'))[0].max
     const maxFanduelPoints = (await knex('stats').max('fanduelPoints as max'))[0].max
-    const maxFanduelPointsPerMinute = (await knex('stats').max('fanduelPointsPerMinute as max'))[0].max
+    const maxFanduelPointsPerMinute = (await knex('stats').where('minutes', '>=', 10).max('fanduelPointsPerMinute as max'))[0].max
     const maxFanduelPointsPerKDollars = (await knex('stats').max('fanduelPointsPerKDollars as max'))[0].max
-    return {maxFanduelPoints, maxFanduelPointsPerMinute, maxFanduelPointsPerKDollars, maxFanduelSalary, stats}
+    return {maxFanduelPoints, maxFanduelPointsPerMinute, maxFanduelPointsPerKDollars, maxFanduelSalary, season, stats}
   }
 
   render () {
-    const {maxFanduelPoints, maxFanduelPointsPerMinute, maxFanduelPointsPerKDollars, maxFanduelSalary, stats} = this.props
+    const {maxFanduelPoints, maxFanduelPointsPerMinute, maxFanduelPointsPerKDollars, maxFanduelSalary, season, stats} = this.props
 
     return (
       <Box>
@@ -64,6 +67,7 @@ class Home extends React.Component<Props> {
                     height: CHART_HEIGHT,
                     title: 'Fanduel Salaries',
                     width: CHART_WIDTH,
+                    xaxis: {range: [season[0], season[1]]},
                     yaxis: {range: [0, maxFanduelSalary]}
                   }}
                 />
@@ -78,6 +82,7 @@ class Home extends React.Component<Props> {
                     height: CHART_HEIGHT,
                     title: 'Fanduel Points',
                     width: CHART_WIDTH,
+                    xaxis: {range: [season[0], season[1]]},
                     yaxis: {range: [0, maxFanduelPoints]},
                   }}
                 />
@@ -92,6 +97,7 @@ class Home extends React.Component<Props> {
                     height: CHART_HEIGHT,
                     title: 'Fanduel Points Per Minute',
                     width: CHART_WIDTH,
+                    xaxis: {range: [season[0], season[1]]},
                     yaxis: {range: [0, maxFanduelPointsPerMinute]},
                   }}
                 />
@@ -106,6 +112,7 @@ class Home extends React.Component<Props> {
                     height: CHART_HEIGHT,
                     title: 'Fanduel Points Per $1k',
                     width: CHART_WIDTH,
+                    xaxis: {range: [season[0], season[1]]},
                     yaxis: {range: [0, maxFanduelPointsPerKDollars]},
                   }}
                 />

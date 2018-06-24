@@ -5,6 +5,7 @@ import * as ProgressBar from 'progress'
 import * as scrapeIt from 'scrape-it'
 
 import knex from './knex'
+import SEASONS from './seasons'
 
 interface Row {
   date: Date,
@@ -25,10 +26,6 @@ interface Row {
 
 class Scraper {
   private static NETWORK_ACRONYMS = ['dk', 'fd']
-  private static SEASONS = {
-    2016: [new Date('2016-10-25'), new Date('2017-06-12')],
-    2017: [new Date('2017-10-17'), new Date('2018-06-08')],
-  }
 
   private static convertId = raw => {
     const m = raw.match(/(\d+)?x$/)
@@ -64,7 +61,7 @@ class Scraper {
   private endDate: Date
 
   public constructor (season: number) {
-    const [startDate, endDate] = Scraper.SEASONS[season]
+    const [startDate, endDate] = SEASONS[season]
     
     if (!startDate || !endDate) {
       throw new Error('invalid season')
