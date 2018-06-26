@@ -86,8 +86,6 @@ class HomePage extends React.Component<Props> {
         {stats.map(rows => {
           const {name, playerId} = rows[0]
           const dates = map(rows, 'date')
-          const pointsPerMinutes = map(rows, 'fanduelPointsPerMinute')
-          const pointsPerKDollars = map(rows, 'fanduelPointsPerKDollars')
 
           return (
             <Box key={playerId}>
