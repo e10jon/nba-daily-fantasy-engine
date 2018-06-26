@@ -4,6 +4,7 @@ import * as _map from 'lodash/map'
 import * as _remove from 'lodash/remove'
 import * as _sample from 'lodash/sample'
 import * as _shuffle from 'lodash/shuffle'
+import * as _sortBy from 'lodash/sortBy'
 import * as _sum from 'lodash/sum'
 
 import {getColumnPrefix, statsTable} from './db'
@@ -83,7 +84,9 @@ export default class LineupCreator {
   fillPool = async () => {
     const rows = await statsTable().where({date: this.date})
     const columnPrefix = getColumnPrefix(this.network)
-    this.pool = rows.reduce((arr, row) => {
+
+    // from most to least valuable
+    this.pool = _sortBy(rows.reduce((arr, row) => {
       const {playerId} = row
       const position = row[`${columnPrefix}Position`]
       const salary = row[`${columnPrefix}Salary`]
@@ -92,10 +95,10 @@ export default class LineupCreator {
         arr.push(new Player(playerId, position, salary, value))
       }
       return arr
-    }, [])
+    }, []), p => p.value * -1)
   }
 
-  generateLineup = () => {
+  generateLineup = (): Lineup => {
     const lineup = new Lineup(this.network)
 
     let pgs = []
@@ -159,6 +162,12 @@ export default class LineupCreator {
     }
 
     return lineup
+  }
+
+  generatePopulation = (): Lineup[] => {
+    const population = []
+    for (let i = 0; i < this.pool.length; ++i) population.push(this.generateLineup())
+    return population
   }
 
   private createValue = (row, {columnPrefix}) => {
