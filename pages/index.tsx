@@ -3,7 +3,7 @@ import * as map from 'lodash/map'
 import * as values from 'lodash/values'
 import dynamic from 'next/dynamic'
 import * as React from 'react'
-import {Box, Divider, Flex, Heading} from 'rebass'
+import {Box, Divider, Flex, Heading, Link} from 'rebass'
 
 import {statsTable} from '../db'
 import SEASONS from '../seasons'
@@ -15,16 +15,15 @@ interface Props {
   maxFanduelPointsPerMinute: number,
   maxFanduelPointsPerKDollars: number,
   maxFanduelSalary: number,
+  page: number,
   season: [number, number],
   stats: Array<Array<any>>,
 }
 
-const CHART_HEIGHT = 400
-const CHART_WIDTH = 600
 const PER_PAGE = 20
 
 class Home extends React.Component<Props> {
-  static getInitialProps = async ({query}) => {
+  static getInitialProps = async ({query}): Promise<Props> => {
     const season = SEASONS[query.season || '2017']
     const page = parseInt(query.page || '1')
 
@@ -35,14 +34,20 @@ class Home extends React.Component<Props> {
     const maxFanduelPointsPerMinute = (await statsTable().where('minutes', '>=', 10).max('fanduelPointsPerMinute as max'))[0].max
     const maxFanduelPointsPerKDollars = (await statsTable().max('fanduelPointsPerKDollars as max'))[0].max
 
-    return {maxFanduelPoints, maxFanduelPointsPerMinute, maxFanduelPointsPerKDollars, maxFanduelSalary, season, stats}
+    return {maxFanduelPoints, maxFanduelPointsPerMinute, maxFanduelPointsPerKDollars, maxFanduelSalary, page, season, stats}
   }
 
   render () {
-    const {maxFanduelPoints, maxFanduelPointsPerMinute, maxFanduelPointsPerKDollars, maxFanduelSalary, season, stats} = this.props
+    const {maxFanduelPoints, maxFanduelPointsPerMinute, maxFanduelPointsPerKDollars, maxFanduelSalary, page, season, stats} = this.props
+    const commonPlotLayout = {
+      font: {family: 'IBM Plex Mono'},
+      height: 300, width: 400,
+      margin: {l: 30, r: 30, b: 30, t: 30, pad: 0},
+      xaxis: {range: [season[0], season[1]]},
+    }
 
     return (
-      <Box>
+      <Box mb={4}>
         <Heading>NBA Daily Fantasy Engine</Heading>
         <Divider />
 
@@ -56,7 +61,7 @@ class Home extends React.Component<Props> {
 
           return (
             <Box key={playerId}>
-              <Heading fontSize={4}>{name}</Heading>
+              <Heading fontSize={4} mb={3}>{name}</Heading>
               <Flex flexWrap='no-wrap'>
                 <Plot
                   data={[{
@@ -66,11 +71,9 @@ class Home extends React.Component<Props> {
                     type: 'scatter',
                   }]}
                   layout={{
-                    height: CHART_HEIGHT,
                     title: 'Fanduel Salaries',
-                    width: CHART_WIDTH,
-                    xaxis: {range: [season[0], season[1]]},
-                    yaxis: {range: [0, maxFanduelSalary]}
+                    yaxis: {range: [0, maxFanduelSalary]},
+                    ...commonPlotLayout,
                   }}
                 />
                 <Plot
@@ -81,11 +84,9 @@ class Home extends React.Component<Props> {
                     type: 'scatter',
                   }]}
                   layout={{
-                    height: CHART_HEIGHT,
                     title: 'Fanduel Points',
-                    width: CHART_WIDTH,
-                    xaxis: {range: [season[0], season[1]]},
                     yaxis: {range: [0, maxFanduelPoints]},
+                    ...commonPlotLayout,
                   }}
                 />
                 <Plot
@@ -96,11 +97,9 @@ class Home extends React.Component<Props> {
                     type: 'scatter',
                   }]}
                   layout={{
-                    height: CHART_HEIGHT,
                     title: 'Fanduel Points Per Minute',
-                    width: CHART_WIDTH,
-                    xaxis: {range: [season[0], season[1]]},
                     yaxis: {range: [0, maxFanduelPointsPerMinute]},
+                    ...commonPlotLayout,
                   }}
                 />
                 <Plot
@@ -111,11 +110,9 @@ class Home extends React.Component<Props> {
                     type: 'scatter',
                   }]}
                   layout={{
-                    height: CHART_HEIGHT,
                     title: 'Fanduel Points Per $1k',
-                    width: CHART_WIDTH,
-                    xaxis: {range: [season[0], season[1]]},
                     yaxis: {range: [0, maxFanduelPointsPerKDollars]},
+                    ...commonPlotLayout,
                   }}
                 />
               </Flex>
@@ -123,6 +120,8 @@ class Home extends React.Component<Props> {
             </Box>
           )
         })}
+        {page > 1 && <Link bg='blue' color='white' mr={2} px={3} py={2} href={`/?page=${page - 1}`}>Prev</Link>}
+        <Link bg='blue' color='white' px={3} py={2} href={`/?page=${page + 1}`}>Next</Link>
       </Box>
     )
   }
