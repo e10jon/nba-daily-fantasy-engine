@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "knex": "knex",
-    "test": "ts-mocha -p . test/**/*.spec.ts",
+    "test": "ts-mocha -p . -w -R min --watch-extensions ts test/**/*.spec.ts",
     "scrape": "ts-node scraper.ts",
     "scrape-2016": "npm run scrape 2016",
     "scrape-2017": "npm run scrape 2017",

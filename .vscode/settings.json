@@ -1,0 +1,8 @@
+{
+  "mocha.options": {
+    "compilers": "ts:ts-node/register"
+  },
+  "mocha.requires": [
+      "ts-node/register"
+  ],
+}

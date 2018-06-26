@@ -1,11 +1,10 @@
 import * as _compact from 'lodash/compact'
 import * as _map from 'lodash/map'
 import * as _sum from 'lodash/sum'
-import Networks from './networks'
 
-enum Strategies {
-  Actual
-}
+import {getColumnPrefix, statsTable} from './db'
+import Networks from './networks'
+import Strategies from './strategies';
 
 class Player {
   playerId: number
@@ -38,9 +37,9 @@ class Lineup {
     this.network = network
   }
 
-  public isValid = () => this.isFilled() && this.isUnderSalaryCap()
+  isValid = () => this.isFilled() && this.isUnderSalaryCap()
 
-  public players = () => _compact([this.pg1, this.pg2, this.sg1, this.sg2, this.sf1, this.sf2, this.pf1, this.pg2, this.c, this.u])
+  players = () => _compact([this.pg1, this.pg2, this.sg1, this.sg2, this.sf1, this.sf2, this.pf1, this.pg2, this.c, this.u])
 
   private isFilled = () => {
     switch (this.network) {
@@ -63,14 +62,37 @@ class Lineup {
   private totalValue = () => _sum(_map(this.players(), 'value'))
 }
 
-class LineupCreator {
-  date: Date
+export default class LineupCreator {
+  date: string
   network: number
+  pool: Player[]
   strategy: number
 
-  constructor (date: Date, network: number, strategy: number) {
+  constructor (date: string, network: number, strategy: number) {
     this.date = date
     this.network = network
     this.strategy = strategy
+  }
+
+  fillPool = async () => {
+    const rows = await statsTable().where({date: this.date})
+    const columnPrefix = getColumnPrefix(this.network)
+    this.pool = rows.reduce((arr, row) => {
+      const {playerId} = row
+      const position = row[`${columnPrefix}Position`]
+      const salary = row[`${columnPrefix}Salary`]
+      const value = this.createValue(row, {columnPrefix})
+      if (playerId && position && salary && value) {
+        arr.push(new Player(playerId, position, salary, value))
+      }
+      return arr
+    }, [])
+  }
+
+  private createValue = (row, {columnPrefix}) => {
+    switch (this.strategy) {
+      case Strategies.Actual:
+        return row[`${columnPrefix}Points`]
+    }
   }
 }
