@@ -39,7 +39,9 @@ class Home extends React.Component<Props> {
 
   render () {
     const {maxFanduelPoints, maxFanduelPointsPerMinute, maxFanduelPointsPerKDollars, maxFanduelSalary, page, season, stats} = this.props
+    const commonPlotProps = {config: {staticPlot: true}}
     const commonPlotLayout = {
+      displayModeBar: false,
       font: {family: 'IBM Plex Mono'},
       height: 300, width: 400,
       margin: {l: 30, r: 30, b: 30, t: 30, pad: 0},
@@ -63,7 +65,7 @@ class Home extends React.Component<Props> {
             <Box key={playerId}>
               <Heading fontSize={4} mb={3}>{name}</Heading>
               <Flex flexWrap='no-wrap'>
-                <Plot
+                <Plot {...commonPlotProps}
                   data={[{
                     x: dates,
                     y: fanduelSalaries,
@@ -76,7 +78,7 @@ class Home extends React.Component<Props> {
                     ...commonPlotLayout,
                   }}
                 />
-                <Plot
+                <Plot {...commonPlotProps}
                   data={[{
                     x: dates,
                     y: fanduelPoints,
@@ -89,7 +91,7 @@ class Home extends React.Component<Props> {
                     ...commonPlotLayout,
                   }}
                 />
-                <Plot
+                <Plot {...commonPlotProps}
                   data={[{
                     x: dates,
                     y: fanduelPointsPerMinutes,
@@ -102,7 +104,7 @@ class Home extends React.Component<Props> {
                     ...commonPlotLayout,
                   }}
                 />
-                <Plot
+                <Plot {...commonPlotProps}
                   data={[{
                     x: dates,
                     y: fanduelPointsPerKDollars,
