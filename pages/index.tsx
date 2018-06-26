@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 import * as React from 'react'
 import {Box, Divider, Flex, Heading} from 'rebass'
 
-import knex from '../knex'
+import {statsTable} from '../db'
 import SEASONS from '../seasons'
 
 const Plot = dynamic(import('../components/plot'), {ssr: false})
@@ -27,12 +27,14 @@ class Home extends React.Component<Props> {
   static getInitialProps = async ({query}) => {
     const season = SEASONS[query.season || '2017']
     const page = parseInt(query.page || '1')
-    const playerIds = map(await knex('stats').distinct('playerId').orderBy('name', 'ASC').limit(PER_PAGE).offset((page - 1) * PER_PAGE), 'playerId')
-    const stats = values(groupBy(await knex('stats').whereIn('playerId', playerIds).where('date', '>=', season[0]).andWhere('date', '<=', season[1]).orderBy('date', 'ASC'), 'playerId'))
-    const maxFanduelSalary = (await knex('stats').max('fanduelSalary as max'))[0].max
-    const maxFanduelPoints = (await knex('stats').max('fanduelPoints as max'))[0].max
-    const maxFanduelPointsPerMinute = (await knex('stats').where('minutes', '>=', 10).max('fanduelPointsPerMinute as max'))[0].max
-    const maxFanduelPointsPerKDollars = (await knex('stats').max('fanduelPointsPerKDollars as max'))[0].max
+
+    const playerIds = map(await statsTable().distinct('playerId').orderBy('name', 'ASC').limit(PER_PAGE).offset((page - 1) * PER_PAGE), 'playerId')
+    const stats = values(groupBy(await statsTable().whereIn('playerId', playerIds).where('date', '>=', season[0]).andWhere('date', '<=', season[1]).orderBy('date', 'ASC'), 'playerId'))
+    const maxFanduelSalary = (await statsTable().max('fanduelSalary as max'))[0].max
+    const maxFanduelPoints = (await statsTable().max('fanduelPoints as max'))[0].max
+    const maxFanduelPointsPerMinute = (await statsTable().where('minutes', '>=', 10).max('fanduelPointsPerMinute as max'))[0].max
+    const maxFanduelPointsPerKDollars = (await statsTable().max('fanduelPointsPerKDollars as max'))[0].max
+
     return {maxFanduelPoints, maxFanduelPointsPerMinute, maxFanduelPointsPerKDollars, maxFanduelSalary, season, stats}
   }
 

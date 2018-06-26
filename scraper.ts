@@ -4,33 +4,38 @@ import * as differenceInCalendarDays from 'date-fns/difference_in_calendar_days'
 import * as ProgressBar from 'progress'
 import * as scrapeIt from 'scrape-it'
 
-import knex from './knex'
+import {insertStatsRows} from './db'
+import Networks from './networks'
 import SEASONS from './seasons'
 
 interface Row {
   date: Date,
   didStart: boolean,
-  playerId: number, 
-  position: string, 
+  playerId: number,  
   name: string, 
   minutes: number,
-  fanduelPoints?: number,
-  draftkingsPoints?: number, 
-  fanduelPointsPerMinute?: number,
-  draftkingsPointsPerMinute?: number, 
-  fanduelSalary?: number,
-  draftkingsSalary?: number,
-  fanduelPointsPerKDollars?: number,
-  draftkingsPointsPerKDollars?: number,
+  draftkingsPosition: string, 
+  fanduelPosition: string,
+  fanduelPoints: number,
+  draftkingsPoints: number, 
+  fanduelPointsPerMinute: number,
+  draftkingsPointsPerMinute: number, 
+  fanduelSalary: number,
+  draftkingsSalary: number,
+  fanduelPointsPerKDollars: number,
+  draftkingsPointsPerKDollars: number,
 }
 
 class Scraper {
-  private static NETWORK_ACRONYMS = ['dk', 'fd']
+  private static calculatePointsPerMinute = (points, minutes) => minutes ? points / minutes : 0
+  private static calculatePointsPerKDollars = (points, salary) => salary ? points / salary * 1000 : 0
 
   private static convertId = raw => {
     const m = raw.match(/(\d+)?x$/)
     return m ? parseInt(m[1]) : undefined
   }
+
+  private static convertDidStart = raw => raw && raw.endsWith('^')
 
   private static convertName = raw => raw.replace(/\^$/, '')
 
@@ -41,19 +46,18 @@ class Scraper {
     return parseInt(parts[0]) + (parseInt(parts[1]) / 60)
   }
 
-  private static isValidScrapedRow = r => r.playerId && (!isNaN(r.fanduelPoints) || !isNaN(r.draftkingsPoints)) && (!isNaN(r.fanduelSalary) || !isNaN(r.draftkingsSalary))
+  private static convertSalary = raw => parseInt(raw.slice(1).replace(/,/, ''))
 
-  private static getPointsKey = acronym => {
-    switch (acronym) {
-      case 'dk': return 'draftkingsPoints'
-      case 'fd': return 'fanduelPoints'
-    }
-  }
+  private static isValidScrapedRow = r => r.playerId 
+    && (!isNaN(r.fanduelPoints) || !isNaN(r.draftkingsPoints)) 
+    && (!isNaN(r.fanduelSalary) || !isNaN(r.draftkingsSalary))
 
-  private static getSalaryKey = acronym => {
-    switch (acronym) {
-      case 'dk': return 'draftkingsSalary'
-      case 'fd': return 'fanduelSalary'
+  private static getNetworkVars = network => {
+    switch (network) {
+      case Networks.DraftKings:
+        return {acronym: 'dk', keyPrefix: 'draftkings'}
+      case Networks.FanDuel: 
+        return {acronym: 'fd', keyPrefix: 'fanduel'}
     }
   }
 
@@ -88,24 +92,25 @@ class Scraper {
     const progressBar = new ProgressBar(':date [:bar] :percent :etas', {total: differenceInCalendarDays(endDate, startDate), width: 50})
 
     for (let date = startDate; date <= endDate; date = addDays(date, 1)) {
-      const allRows = await Promise.all(Scraper.NETWORK_ACRONYMS.map(async acronym => {
+      const allRows = await Promise.all([Networks.FanDuel, Networks.DraftKings].map(async network => {
+        const {acronym, keyPrefix} = Scraper.getNetworkVars(network)
         const url = `http://rotoguru1.com/cgi-bin/hyday.pl?game=${acronym}&mon=${date.getMonth() + 1}&day=${date.getDate()}&year=${date.getFullYear()}`
-        const pointsKey = Scraper.getPointsKey(acronym)
-        const salaryKey = Scraper.getSalaryKey(acronym)
+
         const res: {rows?: Row[]} = await this.scrape(url, {
           rows: {
             listItem: 'tr',
             data: {
               playerId: {selector: 'td:nth-child(2) > a', attr: 'href', convert: Scraper.convertId},
-              position: {selector: 'td', eq: 0},
               name: {selector: 'td', eq: 1, convert: Scraper.convertName},
-              [pointsKey]: {selector: 'td', eq: 2, convert: x => parseFloat(x)},
-              [salaryKey]: {selector: 'td', eq: 3, convert: x => parseInt(x.slice(1).replace(/,/, ''))},
               minutes: {selector: 'td', eq: 7, convert: Scraper.convertMinutes},
-              didStart: {selector: 'td', eq: 1, convert: x => x && x.endsWith('^')},
+              didStart: {selector: 'td', eq: 1, convert: Scraper.convertDidStart},
+              [`${keyPrefix}Position`]: {selector: 'td', eq: 0},
+              [`${keyPrefix}Points`]: {selector: 'td', eq: 2, convert: parseFloat},
+              [`${keyPrefix}Salary`]: {selector: 'td', eq: 3, convert: Scraper.convertSalary},
             }
           }
         })
+
         if (res && res.rows) {
           return res.rows.filter(Scraper.isValidScrapedRow)
         } else {
@@ -117,12 +122,13 @@ class Scraper {
       const rowsMap = allRows.reduce((map, rows) => {
         for (const row of rows) {
           if (row.fanduelPoints) {
-            row.fanduelPointsPerMinute = row.minutes ? row.fanduelPoints / row.minutes : 0
-            row.fanduelPointsPerKDollars = row.fanduelSalary ? row.fanduelPoints / row.fanduelSalary * 1000 : 0
+            row.fanduelPointsPerMinute = Scraper.calculatePointsPerMinute(row.fanduelPoints, row.minutes)
+            row.fanduelPointsPerKDollars = Scraper.calculatePointsPerKDollars(row.fanduelPoints, row.fanduelSalary)
           } else if (row.draftkingsPoints) {
-            row.draftkingsPointsPerMinute = row.minutes ? row.draftkingsPoints / row.minutes : 0
-            row.draftkingsPointsPerKDollars = row.draftkingsSalary ? row.draftkingsPoints / row.draftkingsSalary * 1000 : 0
+            row.draftkingsPointsPerMinute = Scraper.calculatePointsPerMinute(row.draftkingsPoints, row.minutes)
+            row.draftkingsPointsPerKDollars = Scraper.calculatePointsPerKDollars(row.draftkingsPoints, row.draftkingsSalary)
           }
+
           if (map.has(row.playerId)) {
             map.set(row.playerId, {...map.get(row.playerId), ...row})
           } else {
@@ -133,7 +139,7 @@ class Scraper {
       }, new Map())
 
       const rows = Array.from(rowsMap.values())
-      await knex.batchInsert('stats', rows, 500)
+      await insertStatsRows(rows)
 
       progressBar.tick({date: formatDate(date, 'YYYY-M-D')})
     }
