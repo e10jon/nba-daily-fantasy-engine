@@ -4,11 +4,11 @@ import * as differenceInCalendarDays from 'date-fns/difference_in_calendar_days'
 import * as ProgressBar from 'progress'
 import * as scrapeIt from 'scrape-it'
 
-import {insertStatsRows} from './db'
+import {getColumnPrefix, insertStatsRows} from './db'
 import Networks from './networks'
 import SEASONS from './seasons'
 
-interface Row {
+export interface Row {
   date: Date,
   didStart: boolean,
   playerId: number,  
@@ -52,12 +52,10 @@ class Scraper {
     && (!isNaN(r.fanduelPoints) || !isNaN(r.draftkingsPoints)) 
     && (!isNaN(r.fanduelSalary) || !isNaN(r.draftkingsSalary))
 
-  private static getNetworkVars = network => {
+  private static getAcronym = network => {
     switch (network) {
-      case Networks.DraftKings:
-        return {acronym: 'dk', keyPrefix: 'draftkings'}
-      case Networks.FanDuel: 
-        return {acronym: 'fd', keyPrefix: 'fanduel'}
+      case Networks.DraftKings: return 'dk'
+      case Networks.FanDuel: return 'fd'
     }
   }
 
@@ -93,7 +91,8 @@ class Scraper {
 
     for (let date = startDate; date <= endDate; date = addDays(date, 1)) {
       const allRows = await Promise.all([Networks.FanDuel, Networks.DraftKings].map(async network => {
-        const {acronym, keyPrefix} = Scraper.getNetworkVars(network)
+        const acronym = Scraper.getAcronym(network)
+        const columnPrefix = getColumnPrefix(network)
         const url = `http://rotoguru1.com/cgi-bin/hyday.pl?game=${acronym}&mon=${date.getMonth() + 1}&day=${date.getDate()}&year=${date.getFullYear()}`
 
         const res: {rows?: Row[]} = await this.scrape(url, {
@@ -104,9 +103,9 @@ class Scraper {
               name: {selector: 'td', eq: 1, convert: Scraper.convertName},
               minutes: {selector: 'td', eq: 7, convert: Scraper.convertMinutes},
               didStart: {selector: 'td', eq: 1, convert: Scraper.convertDidStart},
-              [`${keyPrefix}Position`]: {selector: 'td', eq: 0},
-              [`${keyPrefix}Points`]: {selector: 'td', eq: 2, convert: parseFloat},
-              [`${keyPrefix}Salary`]: {selector: 'td', eq: 3, convert: Scraper.convertSalary},
+              [`${columnPrefix}Position`]: {selector: 'td', eq: 0},
+              [`${columnPrefix}Points`]: {selector: 'td', eq: 2, convert: parseFloat},
+              [`${columnPrefix}Salary`]: {selector: 'td', eq: 3, convert: Scraper.convertSalary},
             }
           }
         })

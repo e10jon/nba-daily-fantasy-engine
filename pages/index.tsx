@@ -3,42 +3,59 @@ import * as map from 'lodash/map'
 import * as values from 'lodash/values'
 import dynamic from 'next/dynamic'
 import * as React from 'react'
-import {Box, Divider, Flex, Heading, Link} from 'rebass'
+import {Box, Divider, Flex, Heading, Link, Select} from 'rebass'
 
-import {statsTable} from '../db'
+import {getColumnPrefix, statsTable} from '../db'
+import Networks from '../networks'
 import SEASONS from '../seasons'
+import {Row} from '../scraper'
 
 const Plot = dynamic(import('../components/plot'), {ssr: false})
 
 interface Props {
-  maxFanduelPoints: number,
-  maxFanduelPointsPerMinute: number,
-  maxFanduelPointsPerKDollars: number,
-  maxFanduelSalary: number,
+  columnPrefix: string,
+  maxPoints: number,
+  maxPointsPerMinute: number,
+  maxPointsPerKDollars: number,
+  maxSalary: number,
+  network: number,
   page: number,
   season: [number, number],
-  stats: Array<Array<any>>,
+  stats: Array<Array<Row>>,
 }
 
 const PER_PAGE = 20
 
-class Home extends React.Component<Props> {
+class HomePage extends React.Component<Props> {
   static getInitialProps = async ({query}): Promise<Props> => {
+    const network = parseInt(query.network || Networks.FanDuel)
+    const columnPrefix = getColumnPrefix(network)
     const season = SEASONS[query.season || '2017']
     const page = parseInt(query.page || '1')
 
     const playerIds = map(await statsTable().distinct('playerId').orderBy('name', 'ASC').limit(PER_PAGE).offset((page - 1) * PER_PAGE), 'playerId')
     const stats = values(groupBy(await statsTable().whereIn('playerId', playerIds).where('date', '>=', season[0]).andWhere('date', '<=', season[1]).orderBy('date', 'ASC'), 'playerId'))
-    const maxFanduelSalary = (await statsTable().max('fanduelSalary as max'))[0].max
-    const maxFanduelPoints = (await statsTable().max('fanduelPoints as max'))[0].max
-    const maxFanduelPointsPerMinute = (await statsTable().where('minutes', '>=', 10).max('fanduelPointsPerMinute as max'))[0].max
-    const maxFanduelPointsPerKDollars = (await statsTable().max('fanduelPointsPerKDollars as max'))[0].max
+    const maxSalary = (await statsTable().max(`${columnPrefix}Salary as max`))[0].max
+    const maxPoints = (await statsTable().max(`${columnPrefix}Points as max`))[0].max
+    const maxPointsPerMinute = (await statsTable().where('minutes', '>=', 10).max(`${columnPrefix}PointsPerMinute as max`))[0].max
+    const maxPointsPerKDollars = (await statsTable().max(`${columnPrefix}PointsPerKDollars as max`))[0].max
 
-    return {maxFanduelPoints, maxFanduelPointsPerMinute, maxFanduelPointsPerKDollars, maxFanduelSalary, page, season, stats}
+    return {columnPrefix, maxPoints, maxPointsPerMinute, maxPointsPerKDollars, maxSalary, network, page, season, stats}
+  }
+
+  private static renderNetworkOption = network => {
+    const text = (() => {
+      switch (network) {
+        case Networks.DraftKings: return 'DraftKings'
+        case Networks.FanDuel: return 'FanDuel'
+      }
+    })()
+    return <option key={network} value={network}>{text}</option>
   }
 
   render () {
-    const {maxFanduelPoints, maxFanduelPointsPerMinute, maxFanduelPointsPerKDollars, maxFanduelSalary, page, season, stats} = this.props
+    const {columnPrefix, maxPoints, maxPointsPerMinute, maxPointsPerKDollars, maxSalary, network, page, season, stats} = this.props
+
     const commonPlotProps = {config: {staticPlot: true}}
     const commonPlotLayout = {
       displayModeBar: false,
@@ -50,16 +67,21 @@ class Home extends React.Component<Props> {
 
     return (
       <Box mb={4}>
-        <Heading>NBA Daily Fantasy Engine</Heading>
+        <Flex alignItems='center' justifyContent='space-between'>
+          <Heading>NBA Daily Fantasy Engine</Heading>
+          <Box>
+            <Select onChange={this.handleNetworkSelectChange} value={network}>
+              {[Networks.FanDuel, Networks.DraftKings].map(HomePage.renderNetworkOption)}
+            </Select>
+          </Box>
+        </Flex>
         <Divider />
 
         {stats.map(rows => {
           const {name, playerId} = rows[0]
           const dates = map(rows, 'date')
-          const fanduelSalaries = map(rows, 'fanduelSalary')
-          const fanduelPoints = map(rows, 'fanduelPoints')
-          const fanduelPointsPerMinutes = map(rows, 'fanduelPointsPerMinute')
-          const fanduelPointsPerKDollars = map(rows, 'fanduelPointsPerKDollars')
+          const pointsPerMinutes = map(rows, 'fanduelPointsPerMinute')
+          const pointsPerKDollars = map(rows, 'fanduelPointsPerKDollars')
 
           return (
             <Box key={playerId}>
@@ -68,52 +90,52 @@ class Home extends React.Component<Props> {
                 <Plot {...commonPlotProps}
                   data={[{
                     x: dates,
-                    y: fanduelSalaries,
+                    y: map(rows, `${columnPrefix}Salary`),
                     mode: 'markers',
                     type: 'scatter',
                   }]}
                   layout={{
-                    title: 'Fanduel Salaries',
-                    yaxis: {range: [0, maxFanduelSalary]},
+                    title: 'Salary',
+                    yaxis: {range: [0, maxSalary]},
                     ...commonPlotLayout,
                   }}
                 />
                 <Plot {...commonPlotProps}
                   data={[{
                     x: dates,
-                    y: fanduelPoints,
+                    y: map(rows, `${columnPrefix}Points`),
                     mode: 'markers',
                     type: 'scatter',
                   }]}
                   layout={{
-                    title: 'Fanduel Points',
-                    yaxis: {range: [0, maxFanduelPoints]},
+                    title: 'Points',
+                    yaxis: {range: [0, maxPoints]},
                     ...commonPlotLayout,
                   }}
                 />
                 <Plot {...commonPlotProps}
                   data={[{
                     x: dates,
-                    y: fanduelPointsPerMinutes,
+                    y: map(rows, `${columnPrefix}PointsPerMinute`),
                     mode: 'markers',
                     type: 'scatter',
                   }]}
                   layout={{
-                    title: 'Fanduel Points Per Minute',
-                    yaxis: {range: [0, maxFanduelPointsPerMinute]},
+                    title: 'Points Per Minute',
+                    yaxis: {range: [0, maxPointsPerMinute]},
                     ...commonPlotLayout,
                   }}
                 />
                 <Plot {...commonPlotProps}
                   data={[{
                     x: dates,
-                    y: fanduelPointsPerKDollars,
+                    y: map(rows, `${columnPrefix}PointsPerKDollars`),
                     mode: 'markers',
                     type: 'scatter',
                   }]}
                   layout={{
-                    title: 'Fanduel Points Per $1k',
-                    yaxis: {range: [0, maxFanduelPointsPerKDollars]},
+                    title: 'Points Per $1k',
+                    yaxis: {range: [0, maxPointsPerKDollars]},
                     ...commonPlotLayout,
                   }}
                 />
@@ -127,6 +149,10 @@ class Home extends React.Component<Props> {
       </Box>
     )
   }
+
+  private handleNetworkSelectChange = e => {
+    window.location.href = `/?network=${e.target.value}`
+  }
 }
 
-export default Home
+export default HomePage
