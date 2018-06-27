@@ -27,7 +27,9 @@ export class Player {
   }
 }
 
-class Lineup {
+export class Lineup {
+  static positionStrings = ['pg1', 'pg2', 'sg1', 'sg2', 'sf1', 'sf2', 'pf1', 'pg2', 'c1', 'g1', 'f1', 'u1']
+
   network: number
   pg1: Player
   pg2: Player
@@ -46,10 +48,75 @@ class Lineup {
     this.network = network
   }
 
+  addPlayer = (player: Player): Player | false => {
+    switch (this.network) {
+      case Networks.DraftKings:
+        if (/\bPG\b/.test(player.position)) {
+          if (!this.pg1) return this.pg1 = player
+          if (!this.g1) return this.g1 = player
+          if (!this.u1) return this.u1 = player
+          return false
+        }
+        if (/\bSG\b/.test(player.position)) {
+          if (!this.sg1) return this.sg1 = player
+          if (!this.g1) return this.g1 = player
+          if (!this.u1) return this.u1 = player
+          return false
+        }
+        if (/\bSF\b/.test(player.position)) {
+          if (!this.sf1) return this.sf1 = player
+          if (!this.f1) return this.f1 = player
+          if (!this.u1) return this.u1 = player
+          return false
+        }
+        if (/\bPF\b/.test(player.position)) {
+          if (!this.pf1) return this.pf1 = player
+          if (!this.f1) return this.f1 = player
+          if (!this.u1) return this.u1 = player
+          return false
+        }
+        if (/\bC\b/.test(player.position)) {
+          if (!this.c1) return this.c1 = player
+          if (!this.u1) return this.u1 = player
+          return false
+        }
+
+      case Networks.FanDuel:
+        if (/\bPG\b/.test(player.position)) {
+          if (!this.pg1) return this.pg1 = player
+          if (!this.pg2) return this.pg2 = player
+          return false
+        }
+        if (/\bSG\b/.test(player.position)) {
+          if (!this.sg1) return this.sg1 = player
+          if (!this.sg2) return this.sg2 = player
+          return false
+        }
+        if (/\bSF\b/.test(player.position)) {
+          if (!this.sf1) return this.sf1 = player
+          if (!this.sf2) return this.sf2 = player
+          return false
+        }
+        if (/\bPF\b/.test(player.position)) {
+          if (!this.pf1) return this.pf1 = player
+          if (!this.pf2) return this.pf2 = player
+          return false
+        }
+        if (/\bC\b/.test(player.position)) {
+          if (!this.c1) return this.c1 = player
+          return false
+        }
+    }
+  }
+
   isValid = () => this.isFilled() && this.isUnderSalaryCap()
   isUnderSalaryCap = () => _sum(_map(this.players(), 'salary')) <= this.salaryCap()
 
-  players = () => _compact([this.pg1, this.pg2, this.sg1, this.sg2, this.sf1, this.sf2, this.pf1, this.pg2, this.c1, this.g1, this.f1, this.u1])
+  players = () => _compact(Lineup.positionStrings.map(p => this[p]))
+  positions = () => Lineup.positionStrings.reduce((h, p) => {
+    if (this[p]) h[p] = this[p]
+    return h
+  }, {})
 
   salaryCap = () => {
     switch (this.network) {
@@ -57,6 +124,9 @@ class Lineup {
       case Networks.FanDuel: return 60000
     }
   }
+
+  totalSalary = () => _sum(_map(this.players(), 'salary'))
+  totalValue = () => _sum(_map(this.players(), 'value'))
 
   private isFilled = () => {
     switch (this.network) {
@@ -66,8 +136,6 @@ class Lineup {
         return this.pg1 && this.pg2 && this.sg1 && this.sg2 && this.sf1 && this.sf2 && this.pf1 && this.pf2 && this.c1
     }
   }
-
-  private totalValue = () => _sum(_map(this.players(), 'value'))
 }
 
 export default class LineupCreator {
@@ -100,16 +168,12 @@ export default class LineupCreator {
   }
 
   generateLineup = (): Lineup => {
-    const lineup = new Lineup(this.network)
+    const lineup = dynamic({pool: this.pool, network: this.network})
 
-    const pool = this.pool
-    const salaryCap = lineup.salaryCap()
-
-    const {maxScore, players} = branchBound({pool, salaryCap})
-
-    console.log('Max score:', maxScore)
     console.log('Memory usage:', process.memoryUsage().heapUsed / 1024 / 1024)
-    console.log('Lineup:', players)
+    console.log('Lineup:', lineup.positions())
+    console.log('Total salary:', lineup.totalSalary())
+    console.log('Total value:', lineup.totalValue())
   
     return lineup
   }

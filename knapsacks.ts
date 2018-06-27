@@ -1,19 +1,18 @@
+import * as _find from 'lodash/find'
 import * as _map from 'lodash/map'
 
-import {Player} from './lineup-creator'
+import {Lineup, Player} from './lineup-creator'
 
 interface Inputs {
   pool: Player[], 
-  salaryCap: number,
+  network: number,
 }
 
-interface Solution {
-  maxScore: number,
-  players: any,
-}
-
-export const branchBound = ({pool, salaryCap}: Inputs): Solution => {
+export const branchBound = ({network, pool}: Inputs): Lineup => {
   pool = pool.sort((a, b) => a.value / a.salary > b.value / b.salary ? -1 : 1)
+
+  const lineup = new Lineup(network)
+  const salaryCap = lineup.salaryCap()
 
   const weights = _map(pool, 'salary')
   const values = _map(pool, 'value')
@@ -89,13 +88,12 @@ export const branchBound = ({pool, salaryCap}: Inputs): Solution => {
     if (v.bound > maxScore) q.push(v)
   }
 
-  return {maxScore, players}
+  return lineup
 }
 
-export const dynamic = ({pool, salaryCap}: Inputs): Solution => {
-  const weights = _map(pool, 'salary')
-  const values = _map(pool, 'value')
-  const playerIds = _map(pool, 'playerId')
+export const dynamic = ({pool, network}: Inputs): Lineup => {
+  const lineup = new Lineup(network)
+  const salaryCap = lineup.salaryCap()
   const poolSize = pool.length
 
   const h = {}
@@ -104,30 +102,33 @@ export const dynamic = ({pool, salaryCap}: Inputs): Solution => {
     h[i] = {}
     for (let w = 0; w <= salaryCap; ++w) {
       if (i === 0 || w === 0) {
-        h[i][w] = {p: null, w: 0}
-      } else if (weights[i - 1] <= w) {
-        const a = h[i - 1][w - weights[i - 1]]
+        h[i][w] = 0
+      } else if (pool[i - 1].salary <= w) {
+        const a = h[i - 1][w - pool[i - 1].salary]
         const b = h[i - 1][w]
-        h[i][w] = values[i - 1] + a.w > b.w ? {...a, w: values[i - 1] + a.w} : b
+        h[i][w] = pool[i - 1].value + a > b ? pool[i - 1].value + a : b
       } else {
         h[i][w] = h[i - 1][w]
       }
     }
   }
 
-  const maxScore = h[poolSize][salaryCap].w
+  const maxScore = h[poolSize][salaryCap]
   let res = maxScore
   let w = salaryCap
   const players = []
 
   for (let i = poolSize; i > 0 && res > 0; --i) {
-    if (h[i - 1][w] && res === h[i - 1][w].w) continue
+    if (h[i - 1][w] && res === h[i - 1][w]) continue
     else {
-      players.push(playerIds[i - 1])
-      res = res - values[i - 1]
-      w = w - weights[i - 1]
+      const playerId = pool[i - 1].playerId
+      const player = _find(pool, {playerId})
+      if (lineup.addPlayer(player)) {
+        res = res - pool[i - 1].value
+        w = w - pool[i - 1].salary
+      }
     }
   }
 
-  return {maxScore, players}
+  return lineup
 }
