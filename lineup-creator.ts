@@ -8,11 +8,12 @@ import * as _sortBy from 'lodash/sortBy'
 import * as _sum from 'lodash/sum'
 
 import {getColumnPrefix, statsTable} from './db'
+import {dynamic, branchBound} from './knapsacks'
 import Networks from './networks'
 import Strategies from './strategies';
 import { fstat } from 'fs';
 
-class Player {
+export class Player {
   playerId: number
   position: string
   salary: number
@@ -50,19 +51,19 @@ class Lineup {
 
   players = () => _compact([this.pg1, this.pg2, this.sg1, this.sg2, this.sf1, this.sf2, this.pf1, this.pg2, this.c1, this.g1, this.f1, this.u1])
 
+  salaryCap = () => {
+    switch (this.network) {
+      case Networks.DraftKings: return 50000
+      case Networks.FanDuel: return 60000
+    }
+  }
+
   private isFilled = () => {
     switch (this.network) {
       case Networks.DraftKings:
         return this.pg1 && this.sg1 && this.sf1 && this.pf1 && this.c1 && this.u1 && this.g1 && this.f1
       case Networks.FanDuel:
         return this.pg1 && this.pg2 && this.sg1 && this.sg2 && this.sf1 && this.sf2 && this.pf1 && this.pf2 && this.c1
-    }
-  }
-
-  private salaryCap = () => {
-    switch (this.network) {
-      case Networks.DraftKings: return 50000
-      case Networks.FanDuel: return 60000
     }
   }
 
@@ -101,66 +102,15 @@ export default class LineupCreator {
   generateLineup = (): Lineup => {
     const lineup = new Lineup(this.network)
 
-    let pgs = []
-    let sgs = []
-    let sfs = []
-    let pfs = []
-    let cs = []
+    const pool = this.pool
+    const salaryCap = lineup.salaryCap()
 
-    for (const player of this.pool) {
-      if (/\bPG\b/.test(player.position)) pgs.push(player)
-      if (/\bSG\b/.test(player.position)) sgs.push(player)
-      if (/\bSF\b/.test(player.position)) sfs.push(player)
-      if (/\bPF\b/.test(player.position)) pfs.push(player)
-      if (/\bC\b/.test(player.position)) cs.push(player)
-    }
+    const {maxScore, players} = branchBound({pool, salaryCap})
 
-    const spots = (() => {
-      switch (this.network) {
-        case Networks.DraftKings: return ['pg1', 'sg1', 'sf1', 'pf1', 'c1', 'g1', 'f1', 'u1']
-        case Networks.FanDuel: return ['pg1', 'pg2', 'sg1', 'sg2', 'sf1', 'sf2', 'pf1', 'pf2', 'c1']
-      }
-    })()
-
-    for (const spot of _shuffle(spots)) {
-      const subpool = (() => {
-        switch (spot) {
-          case 'pg1':
-          case 'pg2':
-            return pgs
-          case 'sg1':
-          case 'sg2':
-            return sgs
-          case 'sf1':
-          case 'sf2':
-            return sfs
-          case 'pf1':
-          case 'pf2':
-            return pfs
-          case 'c1':
-            return cs
-          case 'g1':
-            return _concat(pgs, sgs)
-          case 'f1':
-            return _concat(sfs, pfs)
-          case 'u1':
-            return _concat(pgs, sgs, sfs, pfs, cs)
-        }
-      })()
-
-      let player
-
-      do {
-        player = _sample(subpool)
-        lineup[spot] = player
-      } while (!lineup.isUnderSalaryCap())
-
-      // remove the player from all pools so he can't be picked again
-      for (let s of [pgs, sgs, sfs, pfs, cs]) {
-        _remove(s, p => p.playerId === player.playerId)
-      }
-    }
-
+    console.log('Max score:', maxScore)
+    console.log('Memory usage:', process.memoryUsage().heapUsed / 1024 / 1024)
+    console.log('Lineup:', players)
+  
     return lineup
   }
 
