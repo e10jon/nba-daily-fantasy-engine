@@ -13,13 +13,8 @@ export const branchBound = ({network, pool}: Inputs): Lineup => {
 
   const lineup = new Lineup(network)
   const salaryCap = lineup.salaryCap()
-
-  const weights = _map(pool, 'salary')
-  const values = _map(pool, 'value')
-  const playerIds = _map(pool, 'playerId')
   const poolSize = pool.length
-
-  let players = []
+  let playerIds = []
 
   class Node {
     level
@@ -43,14 +38,14 @@ export const branchBound = ({network, pool}: Inputs): Lineup => {
       let j = this.level + 1
       let totweight = this.weight
 
-      while ((j < poolSize) && (totweight + weights[j] <= salaryCap)) {
-        totweight += weights[j]
-        profitBound += values[j]
+      while ((j < poolSize) && (totweight + pool[j].salary <= salaryCap)) {
+        totweight += pool[j].salary
+        profitBound += pool[j].value
         ++j
       }
 
       if (j < poolSize) {
-        profitBound += (salaryCap - totweight) * values[j] / weights[j]
+        profitBound += (salaryCap - totweight) * pool[j].value / pool[j].salary
       }
 
       this.bound = profitBound
@@ -71,11 +66,13 @@ export const branchBound = ({network, pool}: Inputs): Lineup => {
 
     v.level = u.level + 1
 
-    v.weight = u.weight + weights[v.level]
-    v.profit = u.profit + values[v.level]
+    v.weight = u.weight + pool[v.level].salary
+    v.profit = u.profit + pool[v.level].value
+    v.playerIds = u.playerIds.concat(pool[v.level].playerId)
 
     if (v.weight <= salaryCap && v.profit > maxScore) {
       maxScore = v.profit
+      playerIds = v.playerIds
     }
 
     v.setBound()
@@ -86,6 +83,11 @@ export const branchBound = ({network, pool}: Inputs): Lineup => {
     v.profit = u.profit
     v.setBound()
     if (v.bound > maxScore) q.push(v)
+  }
+
+  for (const playerId of playerIds) {
+    const player = _find(pool, {playerId})
+    lineup.addPlayer(player)
   }
 
   return lineup
@@ -123,10 +125,9 @@ export const dynamic = ({pool, network}: Inputs): Lineup => {
     else {
       const playerId = pool[i - 1].playerId
       const player = _find(pool, {playerId})
-      if (lineup.addPlayer(player)) {
-        res = res - pool[i - 1].value
-        w = w - pool[i - 1].salary
-      }
+      lineup.addPlayer(player)
+      res = res - pool[i - 1].value
+      w = w - pool[i - 1].salary
     }
   }
 

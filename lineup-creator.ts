@@ -168,7 +168,7 @@ export default class LineupCreator {
   }
 
   generateLineup = (): Lineup => {
-    const lineup = dynamic({pool: this.pool, network: this.network})
+    const lineup = branchBound({pool: this.pool, network: this.network})
 
     console.log('Memory usage:', process.memoryUsage().heapUsed / 1024 / 1024)
     console.log('Lineup:', lineup.positions())
