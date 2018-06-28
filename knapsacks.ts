@@ -1,9 +1,11 @@
 import * as _chunk from 'lodash/chunk'
 import * as _concat from 'lodash/concat'
 import * as _find from 'lodash/find'
+import * as _flatten from 'lodash/flatten'
 import * as _map from 'lodash/map'
 import * as _remove from 'lodash/remove'
 import * as _sample from 'lodash/sample'
+import * as _uniqBy from 'lodash/uniqBy'
 
 import {Lineup, Player} from './lineup-creator'
 
@@ -141,88 +143,86 @@ export const dynamic = ({pool, network}: Inputs): Lineup => {
 }
 
 export const genetic = ({network, pool}) => {
-  const numGenerations = 100
-  const populationSize = pool.length
-  const selectionProportion = 3 / 4
-  const mutationRate = 0.0
+  const numGenerations = 10
+  const populationSize = pool.length * 10
+  const selectionProportion = 0.5
+  const mutationRate = 0.2
   const positions = Lineup.positionStrings(network)
 
-  let population: Lineup[] = []
+  const generatePopulation = pool => {
+    const population: Lineup[] = []
 
-  // initialization
-  initializationLoop: for (let i = 0; i < populationSize; ++i) {
-    const subpools = createSubpools(pool)
-    const lineup = new Lineup(network)
+    generatingPopulation: for (let i = 0; i < populationSize; ++i) {
+      const subpools = createSubpools(pool)
+      const lineup = new Lineup(network)
 
-    for (const position of positions) {
-      const subpool = subpoolForPosition(subpools, position)
-      const maxSalary = lineup.salaryCap() - lineup.totalSalary()
-      const eligiblePlayers = subpool.filter(p => p.salary <= maxSalary)
-      
-      // the lineup is too expensive, try again
-      if (eligiblePlayers.length === 0) {
-        --i
-        continue initializationLoop
+      for (const position of positions) {
+        const subpool = subpoolForPosition(subpools, position)
+        const maxSalary = lineup.salaryCap() - lineup.totalSalary()
+        const eligiblePlayers = subpool.filter(p => p.salary <= maxSalary)
+        
+        // the lineup is too expensive, try again
+        if (eligiblePlayers.length === 0) {
+          --i
+          continue generatingPopulation
+        }
+
+        const player = addRandomPlayerToLineupFromSubpool(lineup, eligiblePlayers)
+
+        // remove the player from other subpools if selected
+        for (let k of Object.keys(subpools)) {
+          _remove(subpools[k], p => p.playerId === player.playerId)
+        }
       }
 
-      const player = addRandomPlayerToLineupFromSubpool(lineup, eligiblePlayers)
-
-      // remove the player from other subpools if selected
-      for (let k of Object.keys(subpools)) {
-        _remove(subpools[k], p => p.playerId === player.playerId)
-      }
+      population.push(lineup)
     }
 
-    population.push(lineup)
+    return population
   }
 
-  generationLoop: for (let g = 0; g < numGenerations; ++g) {
+  let bestLineup
+  const subpools = createSubpools(pool)
+
+  // initialization
+  let population = generatePopulation(pool)
+
+  for (let g = 0; g < numGenerations; ++g) {
     // selection
     population = population.sort((p1, p2) => p1.totalValue() > p2.totalValue() ? -1 : 1)
     population = population.slice(0, floor(population.length * selectionProportion))
 
+    // save the best result
+    if (!bestLineup || bestLineup.totalValue() < population[0].totalValue()) bestLineup = population[0]
+    
     // crossover
-    let children = []
-    const subpools = createSubpools(pool)
+    const newPool = _uniqBy(_flatten(population.map(p => p.players())), 'playerId')
+    population = generatePopulation(newPool)
 
-    for (let i = 0; i < populationSize; ++i) {
-      const lineup1 = _sample(population)
-      const lineup2 = _sample(population)
-      
-      for (const position of positions) {
-        // mutation
-        if (random() <= mutationRate) {
-          for (const lineup of [lineup1, lineup2]) {
-            lineup[position] = null
-            const maxSalary = lineup.salaryCap() - lineup.totalSalary()
-            const subpool = subpoolForPosition(subpools, position)
-            const eligiblePlayers = subpool.filter(p => p.salary <= maxSalary)
+    // mutate
+    for (const lineup of population) {
+      if (random() <= mutationRate) {
+        let didMutate = false
 
-            // the lineup is too expensive, try again
-            if (eligiblePlayers.length === 0) {
-              --g
-              continue generationLoop
-            }
-
-            addRandomPlayerToLineupFromSubpool(lineup, eligiblePlayers)
+        while (!didMutate) {
+          const position = _sample(positions)
+          const subpool = subpoolForPosition(subpools, position)
+          const maxSalary = lineup.salaryCap() - (lineup.totalSalary() - lineup[position].salary)
+          const eligiblePlayers = subpool.filter(p => p.salary <= maxSalary)
+          
+          // the lineup is too expensive, try again
+          if (eligiblePlayers.length) {
+            lineup[position] = _sample(eligiblePlayers)
+            didMutate = true
           }
-          continue
-        } 
-
-        // breeding
-        const player1 = lineup1[position]
-        const player2 = lineup2[position]
-        lineup1[position] = null
-        lineup2[position] = null
-        if (!lineup1.addPlayer(player2)) lineup1.addPlayer(player1)
-        if (!lineup2.addPlayer(player1)) lineup2.addPlayer(player2)
+        }
       }
-
-      children = children.concat([lineup1, lineup2])
     }
-    population = children
+    
     console.log(`Max value for generation ${g}:`, max(...population.map(p => p.totalValue())))
   }
+
+  console.log('Best lineup:', bestLineup.toString())
 }
 
 const createSubpools = (pool: Player[]) => {

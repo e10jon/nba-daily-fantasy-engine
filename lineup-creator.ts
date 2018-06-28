@@ -134,6 +134,8 @@ export class Lineup {
     }
   }
 
+  toString = () => `Total value: ${this.totalValue()}, Total salary: ${this.totalSalary()}`
+
   totalSalary = () => _sum(_map(this.players(), 'salary'))
   totalValue = () => _sum(_map(this.players(), 'value'))
 

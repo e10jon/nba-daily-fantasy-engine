@@ -17,7 +17,7 @@ describe('LineupCreator', () => {
           // expect(lineup.isValid()).toBeTruthy()
           // const population = lineupCreator.generatePopulation()
           // expect(population.length).toBe(lineupCreator.pool.length)
-        })
+        }).timeout(0)
       }
     }
   })
