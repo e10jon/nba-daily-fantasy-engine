@@ -8,7 +8,7 @@ import * as _sortBy from 'lodash/sortBy'
 import * as _sum from 'lodash/sum'
 
 import {getColumnPrefix, statsTable} from './db'
-import {dynamic, branchBound} from './knapsacks'
+import {genetic} from './knapsacks'
 import Networks from './networks'
 import Strategies from './strategies';
 import { fstat } from 'fs';
@@ -54,6 +54,8 @@ export class Lineup {
   }
 
   addPlayer = (player: Player): Player | false => {
+    if (this.totalSalary() + player.salary > this.salaryCap()) return false
+
     switch (this.network) {
       case Networks.DraftKings:
         if (/\bPG\b/.test(player.position)) {
@@ -175,12 +177,12 @@ export default class LineupCreator {
   }
 
   generateLineup = (): Lineup => {
-    const lineup = dynamic({pool: this.pool, network: this.network})
+    const lineup = genetic({pool: this.pool, network: this.network})
 
-    console.log('Memory usage:', process.memoryUsage().heapUsed / 1024 / 1024)
-    console.log('Lineup:', lineup.positions())
-    console.log('Total salary:', lineup.totalSalary())
-    console.log('Total value:', lineup.totalValue())
+    // console.log('Memory usage:', process.memoryUsage().heapUsed / 1024 / 1024)
+    // console.log('Lineup:', lineup.positions())
+    // console.log('Total salary:', lineup.totalSalary())
+    // console.log('Total value:', lineup.totalValue())
   
     return lineup
   }

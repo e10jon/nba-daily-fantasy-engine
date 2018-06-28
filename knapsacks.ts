@@ -1,7 +1,13 @@
+import * as _chunk from 'lodash/chunk'
+import * as _concat from 'lodash/concat'
 import * as _find from 'lodash/find'
 import * as _map from 'lodash/map'
+import * as _remove from 'lodash/remove'
+import * as _sample from 'lodash/sample'
 
 import {Lineup, Player} from './lineup-creator'
+
+const {floor, max, random} = Math
 
 interface Inputs {
   pool: Player[], 
@@ -132,4 +138,134 @@ export const dynamic = ({pool, network}: Inputs): Lineup => {
   }
 
   return lineup
+}
+
+export const genetic = ({network, pool}) => {
+  const numGenerations = 100
+  const populationSize = pool.length
+  const selectionProportion = 3 / 4
+  const mutationRate = 0.0
+  const positions = Lineup.positionStrings(network)
+
+  let population: Lineup[] = []
+
+  // initialization
+  initializationLoop: for (let i = 0; i < populationSize; ++i) {
+    const subpools = createSubpools(pool)
+    const lineup = new Lineup(network)
+
+    for (const position of positions) {
+      const subpool = subpoolForPosition(subpools, position)
+      const maxSalary = lineup.salaryCap() - lineup.totalSalary()
+      const eligiblePlayers = subpool.filter(p => p.salary <= maxSalary)
+      
+      // the lineup is too expensive, try again
+      if (eligiblePlayers.length === 0) {
+        --i
+        continue initializationLoop
+      }
+
+      const player = addRandomPlayerToLineupFromSubpool(lineup, eligiblePlayers)
+
+      // remove the player from other subpools if selected
+      for (let k of Object.keys(subpools)) {
+        _remove(subpools[k], p => p.playerId === player.playerId)
+      }
+    }
+
+    population.push(lineup)
+  }
+
+  generationLoop: for (let g = 0; g < numGenerations; ++g) {
+    // selection
+    population = population.sort((p1, p2) => p1.totalValue() > p2.totalValue() ? -1 : 1)
+    population = population.slice(0, floor(population.length * selectionProportion))
+
+    // crossover
+    let children = []
+    const subpools = createSubpools(pool)
+
+    for (let i = 0; i < populationSize; ++i) {
+      const lineup1 = _sample(population)
+      const lineup2 = _sample(population)
+      
+      for (const position of positions) {
+        // mutation
+        if (random() <= mutationRate) {
+          for (const lineup of [lineup1, lineup2]) {
+            lineup[position] = null
+            const maxSalary = lineup.salaryCap() - lineup.totalSalary()
+            const subpool = subpoolForPosition(subpools, position)
+            const eligiblePlayers = subpool.filter(p => p.salary <= maxSalary)
+
+            // the lineup is too expensive, try again
+            if (eligiblePlayers.length === 0) {
+              --g
+              continue generationLoop
+            }
+
+            addRandomPlayerToLineupFromSubpool(lineup, eligiblePlayers)
+          }
+          continue
+        } 
+
+        // breeding
+        const player1 = lineup1[position]
+        const player2 = lineup2[position]
+        lineup1[position] = null
+        lineup2[position] = null
+        if (!lineup1.addPlayer(player2)) lineup1.addPlayer(player1)
+        if (!lineup2.addPlayer(player1)) lineup2.addPlayer(player2)
+      }
+
+      children = children.concat([lineup1, lineup2])
+    }
+    population = children
+    console.log(`Max value for generation ${g}:`, max(...population.map(p => p.totalValue())))
+  }
+}
+
+const createSubpools = (pool: Player[]) => {
+  let pgs = []
+  let sgs = []
+  let sfs = []
+  let pfs = []
+  let cs = []
+
+  for (const player of pool) {
+    if (/\bPG\b/.test(player.position)) pgs.push(player)
+    if (/\bSG\b/.test(player.position)) sgs.push(player)
+    if (/\bSF\b/.test(player.position)) sfs.push(player)
+    if (/\bPF\b/.test(player.position)) pfs.push(player)
+    if (/\bC\b/.test(player.position)) cs.push(player)
+  }
+
+  return {pgs, sgs, sfs, pfs, cs}
+}
+
+const subpoolForPosition = (subpools, position) => {
+  switch (position) {
+    case 'pg1':
+    case 'pg2': return subpools.pgs
+    case 'sg1':
+    case 'sg2': return subpools.sgs
+    case 'sf1':
+    case 'sf2': return subpools.sfs
+    case 'pf1':
+    case 'pf2': return subpools.pfs
+    case 'c1': return subpools.cs
+    case 'g1': return _concat(subpools.pgs, subpools.sgs)
+    case 'f1': return _concat(subpools.sfs, subpools.pfs)
+    case 'u1': return _concat(subpools.pgs, subpools.sgs, subpools.sfs, subpools.pfs, subpools.cs)
+  }
+}
+
+const addRandomPlayerToLineupFromSubpool = (lineup, subpool) => {
+  let player
+
+  do {
+    player = _sample(subpool)
+  } while (!lineup.addPlayer(player))
+
+  return player
 }
