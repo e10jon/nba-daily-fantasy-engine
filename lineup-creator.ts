@@ -28,7 +28,12 @@ export class Player {
 }
 
 export class Lineup {
-  static positionStrings = ['pg1', 'pg2', 'sg1', 'sg2', 'sf1', 'sf2', 'pf1', 'pg2', 'c1', 'g1', 'f1', 'u1']
+  static positionStrings = (network: number) => {
+    switch (network) {
+      case Networks.DraftKings: return ['pg1', 'sg1', 'sf1', 'pf1', 'c1', 'g1', 'f1', 'u1']
+      case Networks.FanDuel: return ['pg1', 'pg2', 'sg1', 'sg2', 'sf1', 'sf2', 'pf1', 'pf2', 'c1']
+    }
+  }
 
   network: number
   pg1: Player
@@ -107,14 +112,16 @@ export class Lineup {
           return false
         }
     }
+    return false
   }
 
   isValid = () => this.isFilled() && this.isUnderSalaryCap()
   isUnderSalaryCap = () => _sum(_map(this.players(), 'salary')) <= this.salaryCap()
 
-  players = () => _compact(Lineup.positionStrings.map(p => this[p]))
-  positions = () => Lineup.positionStrings.reduce((h, p) => {
-    if (this[p]) h[p] = this[p]
+  players = () => _compact(Lineup.positionStrings(this.network).map(p => this[p]))
+
+  positions = () => Lineup.positionStrings(this.network).reduce((h, p) => {
+    h[p] = this[p]
     return h
   }, {})
 
@@ -168,7 +175,7 @@ export default class LineupCreator {
   }
 
   generateLineup = (): Lineup => {
-    const lineup = branchBound({pool: this.pool, network: this.network})
+    const lineup = dynamic({pool: this.pool, network: this.network})
 
     console.log('Memory usage:', process.memoryUsage().heapUsed / 1024 / 1024)
     console.log('Lineup:', lineup.positions())
