@@ -153,6 +153,7 @@ export const genetic = ({network, pool}) => {
 
   const generatePopulation = pool => {
     const population: Lineup[] = []
+    let p = 0
 
     generatingPopulation: for (let i = 0; i < populationSize; ++i) {
       const remPlayers = subpoolsKeys.reduce((h, k) => {
@@ -161,7 +162,15 @@ export const genetic = ({network, pool}) => {
       }, {})
       const lineup = new Lineup(network)
 
+      // guarantee that every player appears in a lineup
+      lineup.addPlayer(pool[p])
+      ++p
+      if (p === pool.length - 1) p = 0
+
+
       for (const position of positions) {
+        if (lineup[position]) continue
+
         const subpool = subpoolForPosition(remPlayers, position)
         const maxSalary = lineup.salaryCap() - lineup.totalSalary()
         const eligiblePlayers = subpool.filter(p => p.salary <= maxSalary)
@@ -172,7 +181,10 @@ export const genetic = ({network, pool}) => {
           continue generatingPopulation
         }
 
-        const player = addRandomPlayerToLineupFromSubpool(lineup, eligiblePlayers)
+        let player
+        do {
+          player = _sample(subpool)
+        } while (!lineup.addPlayer(player))
 
         // remove the player from other subpools if selected
         for (let k of subpoolsKeys) {
@@ -262,14 +274,4 @@ const subpoolForPosition = (subpools, position) => {
     case 'f1': return _concat(subpools.sfs, subpools.pfs)
     case 'u1': return _concat(subpools.pgs, subpools.sgs, subpools.sfs, subpools.pfs, subpools.cs)
   }
-}
-
-const addRandomPlayerToLineupFromSubpool = (lineup, subpool) => {
-  let player
-
-  do {
-    player = _sample(subpool)
-  } while (!lineup.addPlayer(player))
-
-  return player
 }

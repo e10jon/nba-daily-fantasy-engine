@@ -62,61 +62,50 @@ export class Lineup {
       case Networks.DraftKings:
         if (/\bPG\b/.test(player.position)) {
           if (!this.pg1) return this.pg1 = player
-          if (!this.g1) return this.g1 = player
-          if (!this.u1) return this.u1 = player
-          return false
         }
         if (/\bSG\b/.test(player.position)) {
           if (!this.sg1) return this.sg1 = player
-          if (!this.g1) return this.g1 = player
-          if (!this.u1) return this.u1 = player
-          return false
         }
         if (/\bSF\b/.test(player.position)) {
           if (!this.sf1) return this.sf1 = player
-          if (!this.f1) return this.f1 = player
-          if (!this.u1) return this.u1 = player
-          return false
         }
         if (/\bPF\b/.test(player.position)) {
           if (!this.pf1) return this.pf1 = player
-          if (!this.f1) return this.f1 = player
-          if (!this.u1) return this.u1 = player
-          return false
         }
         if (/\bC\b/.test(player.position)) {
           if (!this.c1) return this.c1 = player
-          if (!this.u1) return this.u1 = player
-          return false
         }
+        if (/G/.test(player.position)) {
+          if (!this.g1) return this.g1 = player
+        }
+        if (/F/.test(player.position)) {
+          if (!this.f1) return this.f1 = player
+        }
+        if (!this.u1) return this.u1 = player
+        return false
 
       case Networks.FanDuel:
         if (/\bPG\b/.test(player.position)) {
           if (!this.pg1) return this.pg1 = player
           if (!this.pg2) return this.pg2 = player
-          return false
         }
         if (/\bSG\b/.test(player.position)) {
           if (!this.sg1) return this.sg1 = player
           if (!this.sg2) return this.sg2 = player
-          return false
         }
         if (/\bSF\b/.test(player.position)) {
           if (!this.sf1) return this.sf1 = player
           if (!this.sf2) return this.sf2 = player
-          return false
         }
         if (/\bPF\b/.test(player.position)) {
           if (!this.pf1) return this.pf1 = player
           if (!this.pf2) return this.pf2 = player
-          return false
         }
         if (/\bC\b/.test(player.position)) {
           if (!this.c1) return this.c1 = player
-          return false
         }
+        return false
     }
-    return false
   }
 
   isValid = () => this.isFilled() && this.isUnderSalaryCap()
