@@ -25,6 +25,8 @@ export class Player {
     this.salary = salary
     this.value = value
   }
+
+  valuePerK = () => this.value / (this.salary / 1000)
 }
 
 export class Lineup {
@@ -134,7 +136,7 @@ export class Lineup {
     }
   }
 
-  toString = () => `Total value: ${this.totalValue()}, Total salary: ${this.totalSalary()}`
+  toString = () => `Total value: ${this.totalValue()}, Total salary: ${this.totalSalary()}, Values: [${this.players().map(p => p.value).join(', ')}], PerKs: [${this.players().map(p => p.valuePerK().toFixed(2)).join(', ')}]`
 
   totalSalary = () => _sum(_map(this.players(), 'salary'))
   totalValue = () => _sum(_map(this.players(), 'value'))

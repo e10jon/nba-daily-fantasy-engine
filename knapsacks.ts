@@ -148,16 +148,21 @@ export const genetic = ({network, pool}) => {
   const selectionProportion = 0.5
   const mutationRate = 0.2
   const positions = Lineup.positionStrings(network)
+  const subpools = createSubpools(pool)
+  const subpoolsKeys = Object.keys(subpools)
 
   const generatePopulation = pool => {
     const population: Lineup[] = []
 
     generatingPopulation: for (let i = 0; i < populationSize; ++i) {
-      const subpools = createSubpools(pool)
+      const remPlayers = subpoolsKeys.reduce((h, k) => {
+        h[k] = subpools[k].slice(0)
+        return h
+      }, {})
       const lineup = new Lineup(network)
 
       for (const position of positions) {
-        const subpool = subpoolForPosition(subpools, position)
+        const subpool = subpoolForPosition(remPlayers, position)
         const maxSalary = lineup.salaryCap() - lineup.totalSalary()
         const eligiblePlayers = subpool.filter(p => p.salary <= maxSalary)
         
@@ -170,8 +175,8 @@ export const genetic = ({network, pool}) => {
         const player = addRandomPlayerToLineupFromSubpool(lineup, eligiblePlayers)
 
         // remove the player from other subpools if selected
-        for (let k of Object.keys(subpools)) {
-          _remove(subpools[k], p => p.playerId === player.playerId)
+        for (let k of subpoolsKeys) {
+          _remove(remPlayers[k], p => p.playerId === player.playerId)
         }
       }
 
@@ -182,7 +187,6 @@ export const genetic = ({network, pool}) => {
   }
 
   let bestLineup
-  const subpools = createSubpools(pool)
 
   // initialization
   let population = generatePopulation(pool)
@@ -219,7 +223,7 @@ export const genetic = ({network, pool}) => {
       }
     }
     
-    console.log(`Max value for generation ${g}:`, max(...population.map(p => p.totalValue())))
+    // console.log(`Max value for generation ${g}:`, max(...population.map(p => p.totalValue())))
   }
 
   console.log('Best lineup:', bestLineup.toString())
