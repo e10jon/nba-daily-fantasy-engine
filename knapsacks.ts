@@ -7,7 +7,8 @@ import * as _remove from 'lodash/remove'
 import * as _sample from 'lodash/sample'
 import * as _uniqBy from 'lodash/uniqBy'
 
-import {Lineup, Player} from './lineup-creator'
+import Lineup from './lineup'
+import Player from './player'
 
 const {floor, max, random} = Math
 
@@ -142,11 +143,17 @@ export const dynamic = ({pool, network}: Inputs): Lineup => {
   return lineup
 }
 
-export const genetic = ({network, pool}) => {
-  const numGenerations = 10
-  const populationSize = pool.length * 10
-  const selectionProportion = 0.5
-  const mutationRate = 0.2
+export const genetic = ({network, pool}, opts: {
+  numGenerations?: number,
+  populationSize?: number,
+  selectionProportion?: number,
+  mutationRate?: number,
+}) => {
+  const numGenerations = opts.numGenerations || 10
+  const populationSize = opts.populationSize || pool.length * 10
+  const selectionProportion = opts.selectionProportion || 0.5
+  const mutationRate = opts.mutationRate || 0.2
+
   const positions = Lineup.positionStrings(network)
   const subpools = createSubpools(pool)
   const subpoolsKeys = Object.keys(subpools)
@@ -198,10 +205,9 @@ export const genetic = ({network, pool}) => {
     return population
   }
 
-  let bestLineup
-
   // initialization
   let population = generatePopulation(pool)
+  let bestLineup = population[0]
 
   for (let g = 0; g < numGenerations; ++g) {
     // selection
@@ -209,7 +215,7 @@ export const genetic = ({network, pool}) => {
     population = population.slice(0, floor(population.length * selectionProportion))
 
     // save the best result
-    if (!bestLineup || bestLineup.totalValue() < population[0].totalValue()) bestLineup = population[0]
+    if (bestLineup.totalValue() < population[0].totalValue()) bestLineup = population[0]
     
     // crossover
     const newPool = _uniqBy(_flatten(population.map(p => p.players())), 'playerId')
@@ -238,7 +244,12 @@ export const genetic = ({network, pool}) => {
     // console.log(`Max value for generation ${g}:`, max(...population.map(p => p.totalValue())))
   }
 
-  console.log('Best lineup:', bestLineup.toString())
+  if (!bestLineup.isValid()) {
+    throw new Error('lineup should be valid but is not')
+  }
+
+  // console.log('Best lineup:', bestLineup.toString())
+  return bestLineup
 }
 
 const createSubpools = (pool: Player[]) => {

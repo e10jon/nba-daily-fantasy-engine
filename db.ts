@@ -9,4 +9,6 @@ export const getColumnPrefix = (network: number) => {
 }
 
 export const insertStatsRows = rows => knex.batchInsert('stats', rows, 500)
+
+export const lineupsTable = () => knex('lineups')
 export const statsTable = () => knex('stats')
